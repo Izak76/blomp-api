@@ -1,19 +1,19 @@
-from typing import Iterable, Callable
 from datetime import datetime
 from requests import Response
 from threading import Thread
 from io import BufferedIOBase
+from typing import Iterable, Callable
 
 from ..utils.path import Path
 from ..utils.session import Session
-from ..utils.monitor import Monitor
+from ..utils.monitor import DownloadMonitor, Monitor
 from ..response_types import ShareLinkResponse, FileData
 
 import os, pathlib
 
 
 class File:
-    def __init__(self, path:str|Path, dataobj:FileData, session:Session): # OK
+    def __init__(self, path:str|Path, dataobj:FileData, session:Session):
         if isinstance(path, str):
             path = Path(path)
 
@@ -30,16 +30,16 @@ class File:
         self.__link:str|None = None
         self.__file_path:str = str(self.__path/Path(self.__name))
     
-    def __hash__(self) -> int: # OK
+    def __hash__(self) -> int:
         return hash(self.__hash)
     
-    def __len__(self) -> int: # OK
+    def __len__(self) -> int:
         return self.__length
     
-    def __repr__(self) -> str: # OK
+    def __repr__(self) -> str:
         return "File({0}/{1})".format(self.__path, self.__name)
     
-    def __str__(self) -> str: # OK
+    def __str__(self) -> str:
         return self.__name
     
     def __downloader(self, _response:Response, _file:BufferedIOBase, _buffer_size:int, _update_func:Callable[[int], None]):
@@ -49,27 +49,27 @@ class File:
                 _file.flush()
 
     @property
-    def content_type(self) -> str: # OK
+    def content_type(self) -> str:
         return self.__content_type
     
     @property
-    def file_path(self) -> str: # OK
+    def file_path(self) -> str:
         return self.__file_path
     
     @property
-    def last_modified(self) -> datetime: # OK
+    def last_modified(self) -> datetime:
         return self.__last_modified
     
     @property
-    def md5_hash(self): # OK
+    def md5_hash(self):
         return self.__hash
     
     @property
-    def name(self) -> str: # OK
+    def name(self) -> str:
         return self.__name
     
     @property
-    def size(self) -> int: # OK
+    def size(self) -> int:
         return self.__length
     
     def delete(self) -> bool:
@@ -91,7 +91,7 @@ class File:
             
             fp = open(fp, 'wb')
         
-        monitor = Monitor(self.__length)
+        monitor = DownloadMonitor(self.__length)
         thread = Thread(target=self.__downloader, args=(r, fp, buffer_size, monitor._update))
         thread.start()
 
@@ -109,7 +109,7 @@ class File:
         
         return success
     
-    def share(self, emails:Iterable[str]|None=None, anyone_can_view:bool=False) -> str: # OK
+    def share(self, emails:Iterable[str]|None=None, anyone_can_view:bool=False) -> str:
         perm = int(bool(anyone_can_view))
 
         if emails:
@@ -128,7 +128,7 @@ class File:
         
         return self.__link # type: ignore
     
-    def share_info(self) -> ShareLinkResponse: # OK
+    def share_info(self) -> ShareLinkResponse:
         # TODO: Tornar esse método "privado"
         info: ShareLinkResponse = self.__ss.get("https://dashboard.blomp.com/dashboard/file/share/link",
                             params=dict(path=self.__file_path, size=self.__length)).json()["info"]
@@ -139,7 +139,7 @@ class File:
 
         return info
     
-    def share_switch_off(self) -> bool: # OK
+    def share_switch_off(self) -> bool:
         if self.__file_id is None:
             self.share_info()
         
@@ -151,7 +151,7 @@ class File:
 
         return r.text == "success"
     
-    def share_switch_on(self) -> bool: # OK
+    def share_switch_on(self) -> bool:
         if self.__file_id is None:
             self.share_info()
 

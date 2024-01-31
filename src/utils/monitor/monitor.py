@@ -1,10 +1,15 @@
-class Monitor:
+from typing import Any
+import abc
+
+
+class Monitor(abc.ABC):
     def __init__(self, total_size:int):
         self.__total = total_size
         self.__loaded = 0
     
-    def _update(self, loaded:int):
-        self.__loaded += loaded
+    @abc.abstractmethod
+    def _update(self, loaded:Any):
+        pass
     
     @property
     def total(self) -> int:

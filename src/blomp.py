@@ -9,7 +9,7 @@ Chrome/117.0.0.0 Safari/537.36 \
 Edg/117.0.2045.36"
 
 class Blomp:
-    def __init__(self, email:str, password:str): # OK
+    def __init__(self, email:str, password:str):
         self.__ss = Session()
         self.__ss.headers["User-Agent"] = UA
         self.__ss.headers["Referer"] = "https://www.blomp.com/"
@@ -18,7 +18,9 @@ class Blomp:
         if p.status_code >= 400:
             raise ConnectionRefusedError("Login returned status code {}".format(p.status_code))
         
-        self.__ss.token = re.findall('<meta name="csrf_token" content="(.+)" />', next(p.iter_content(512, True)))[0]
+        content = next(p.iter_content(8192, True))
+        self.__ss.token = re.findall('<meta name="csrf_token" content="(.+)" />', content)[0]
+        self.__ss.client_id = int(re.findall(r'<input type="hidden" id="clientId" value="(\d+)">', content)[0])
     
-    def get_root_directory(self) -> Folder: # OK
+    def get_root_directory(self) -> Folder:
         return Folder("", self.__ss)
