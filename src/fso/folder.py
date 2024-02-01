@@ -1,5 +1,7 @@
-from requests_toolbelt import MultipartEncoderMonitor
-from typing import Union, Iterable
+from requests_toolbelt import MultipartEncoder
+from http.client import HTTPSConnection
+from typing import Union, Iterable, Callable
+from urllib.request import Request
 from io import BufferedIOBase
 from threading import Thread
 from uuid import uuid4
@@ -62,9 +64,29 @@ class Folder:
     def __str__(self) -> str:
         return self.__path_name
     
-    def __uploader(self, _multi_encoder:MultipartEncoderMonitor):
-        self.__ss.post("https://dashboard.blomp.com/dashboard/storage/upload_object",
-                       data=_multi_encoder, headers={"Content-Type": _multi_encoder.content_type})
+    def __uploader(self, _multi_encoder:MultipartEncoder, file_size:int, _update_func:Callable[[int], None]):
+        url, path = "https://dashboard.blomp.com", "/dashboard/storage/upload_object"
+        conn:HTTPSConnection = self.__ss.adapters['https://'].get_connection(url)._get_conn()
+        conn.putrequest("POST", path)
+        
+        for header in self.__ss.headers.items():
+            conn.putheader(*header)
+        
+        conn.putheader("Content-Type", _multi_encoder.content_type)
+        conn.putheader("Content-Length", str(_multi_encoder.len))
+        conn.putheader("Cookie", "; ".join(map(lambda ck: "=".join(ck), self.__ss.cookies.get_dict().items())))
+        conn.endheaders()
+
+        conn.send(_multi_encoder.read(_multi_encoder.len - file_size))
+        data = _multi_encoder.read(8192)
+        while data:
+            _update_func(len(data))
+            conn.send(data)
+            data = _multi_encoder.read(8192)
+        
+        response = conn.getresponse()
+        if response.getheader("Set-Cookie"):
+            self.__ss.cookies.extract_cookies(response, Request(url+path))
     
     @staticmethod
     def __guess_mime(file_uri:str) -> str:
@@ -123,7 +145,7 @@ class Folder:
         boundary = str(uuid4())
         monitor = UploadMonitor(file_size)
 
-        me = MultipartEncoderMonitor.from_fields({
+        me = MultipartEncoder({
             "dzUuid": boundary,
             "dzChunkIndex": "0",
             "dzTotalFileSize": str(file_size),
@@ -139,9 +161,9 @@ class Folder:
             "client-id": str(self.__ss.client_id),
             "pseudo-folder": self.__path_str,
             "myfile": (file_name, file, self.__guess_mime(file_name)) # type: ignore
-        }, boundary, callback=monitor._update)
+        }, boundary)
 
-        thread = Thread(target=self.__uploader, args=[me])
+        thread = Thread(target=self.__uploader, args=[me, file_size, monitor._update])
         thread.start()
 
         return thread, monitor
