@@ -47,6 +47,10 @@ class File:
             for chunk in _response.iter_content(_buffer_size):
                 _update_func(_file.write(chunk))
                 _file.flush()
+    
+    def _parent_path_changed(self, new_path:Path):
+        self.__path = new_path
+        self.__file_path:str = str(self.__path/Path(self.__name))
 
     @property
     def content_type(self) -> str:
@@ -98,7 +102,7 @@ class File:
         return thread, monitor
 
     def rename(self, new_name:str) -> bool:
-        path_ = str(self.__path)
+        path_ = self.__path.as_dir(end_sep=bool(self.__path))
         r = self.__ss.get("https://dashboard.blomp.com/dashboard/file/rename",
                           params=dict(original_name=self.__name, type="file", name=new_name, path=path_))
         

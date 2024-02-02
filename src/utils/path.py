@@ -7,6 +7,9 @@ class Path:
         self.__path_parts = tuple(filter(None, re.split(r"/|\\", initial_path)))
         self.__path_str = path_char.join(self.__path_parts)
     
+    def __bool__(self) -> bool:
+        return bool(self.__path_parts)
+    
     def __repr__(self) -> str:
         return "Path({0})".format(self.__path_str)
     

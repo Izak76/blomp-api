@@ -22,24 +22,11 @@ class Folder:
             path = Path(path)
 
         self.__ss = session
-        self.__path = path
-        self.__path_str = self.__path.as_dir(end_sep=bool(str(path)))
         self.__subdirectories:list[Subdir|Folder] = []
         self.__files:list[File] = []
-        try:
-            self.__path_name = path.parts[-1]
-        except IndexError:
-            self.__path_name = ""
-
-        folder_data:list[FileData | Subdir] = session.get("https://dashboard.blomp.com/dashboard/folder?prefix",
-                                                          params=dict(prefix=self.__path_str)).json()["data"]
-        for fd in folder_data:
-            if "subdir" in fd:
-                self.__subdirectories.append(fd)
-                continue
-
-            if fd["content_type"] != "application/directory":
-                self.__files.append(File(path, fd, session))
+        self.__path = path
+        self._self_path_changed()
+        self.reload()
     
     def __getitem__(self, i:int) -> Union[File, "Folder"]:
         if i < len(self.__subdirectories):
@@ -87,7 +74,28 @@ class Folder:
         response = conn.getresponse()
         if response.getheader("Set-Cookie"):
             self.__ss.cookies.extract_cookies(response, Request(url+path))
+        
+        self.reload()
     
+    def _parent_path_changed(self, new_path:Path):
+        self.__path = new_path/self.__path_name
+        self._self_path_changed()
+    
+    def _self_path_changed(self):
+        self.__path_str = self.__path.as_dir()
+
+        try:
+            self.__path_name = self.__path.parts[-1]
+        except IndexError:
+            self.__path_name = ""
+
+        for sd in self.__subdirectories:
+            if isinstance(sd, Folder):
+              sd._parent_path_changed(self.__path)
+        
+        for file in self.__files:
+            file._parent_path_changed(self.__path)
+
     @staticmethod
     def __guess_mime(file_uri:str) -> str:
         mime = mimetypes.guess_type(file_uri)[0]
@@ -96,7 +104,7 @@ class Folder:
     
     @property
     def parent(self) -> str:
-        return self.__path.parent.as_dir(end_sep=bool(str(self.__path.parent)))
+        return self.__path.parent.as_dir(end_sep=bool(self.__path.parent))
     
     @property
     def path(self) -> str:
@@ -119,11 +127,40 @@ class Folder:
         response = self.__ss.get("https://dashboard.blomp.com/dashboard/file/move", params=params)
         
         if response.text == "success":
-            self.__init__(self.__path, self.__ss)
+            self.reload()
+            ff._parent_path_changed(self.__path)
             return True
         
         return False
     
+    def reload(self):
+        folder_data:list[FileData | Subdir] = self.__ss.get("https://dashboard.blomp.com/dashboard/folder?prefix",
+                                                          params=dict(prefix=self.__path_str)).json()["data"]
+        self.__subdirectories.clear()
+        self.__files.clear()
+
+        for fd in folder_data:
+            if "subdir" in fd:
+                self.__subdirectories.append(fd)
+                continue
+
+            if fd["content_type"] != "application/directory":
+                self.__files.append(File(self.__path, fd, self.__ss))
+
+    def rename(self, new_name:str) -> bool:
+        if not bool(self.__path):
+            raise ValueError("Unable to rename root folder")
+        
+        r = self.__ss.get("https://dashboard.blomp.com/dashboard/file/rename",
+                          params=dict(original_name=self.__path_name, type="folder", name=new_name, path=self.__path_str))
+        
+        success =  r.text == "success"
+        if success:
+            self.__path = self.__path.parent/new_name
+            self._self_path_changed()
+        
+        return success
+
     def upload(self, file:str|pathlib.Path|BufferedIOBase, file_name:str|None=None, file_size:int|None=None) -> tuple[Thread, Monitor]:
         if isinstance(file, (str, pathlib.Path)):
             file = open(file, 'rb')
