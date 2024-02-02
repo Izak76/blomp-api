@@ -1,6 +1,6 @@
 from requests_toolbelt import MultipartEncoder
 from http.client import HTTPSConnection
-from typing import Union, Iterable, Callable
+from typing import Union, Callable, Iterator
 from urllib.request import Request
 from io import BufferedIOBase
 from threading import Thread
@@ -17,15 +17,16 @@ import pathlib
 
 
 class Folder:
-    def __init__(self, path:str|Path, session:Session):
+    def __init__(self, path:str|Path, parent:Union["Folder", None], session:Session):
         if isinstance(path, str):
             path = Path(path)
 
         self.__ss = session
         self.__subdirectories:list[Subdir|Folder] = []
         self.__files:list[File] = []
+        self.__parent = parent
         self.__path = path
-        self._self_path_changed()
+        self._self_path_changed(bool(path))
         self.reload()
     
     def __getitem__(self, i:int) -> Union[File, "Folder"]:
@@ -33,14 +34,14 @@ class Folder:
             sd = self.__subdirectories[i]
 
             if isinstance(sd, dict):
-                sd = Folder(Path(sd["subdir"]), self.__ss)
+                sd = Folder(Path(sd["subdir"]), self, self.__ss)
                 self.__subdirectories[i] = sd
 
             return sd
         
         return  self.__files[i-len(self.__subdirectories)]
     
-    def __iter__(self) -> Iterable[Union[File, "Folder"]]:
+    def __iter__(self) -> Iterator[Union[File, "Folder"]]:
         return map(self.__getitem__, range(len(self.__subdirectories)+len(self.__files)))
     
     def __repr__(self) -> str:
@@ -81,8 +82,8 @@ class Folder:
         self.__path = new_path/self.__path_name
         self._self_path_changed()
     
-    def _self_path_changed(self):
-        self.__path_str = self.__path.as_dir()
+    def _self_path_changed(self, not_is_root:bool=True):
+        self.__path_str = self.__path.as_dir(end_sep=not_is_root)
 
         try:
             self.__path_name = self.__path.parts[-1]
@@ -103,17 +104,66 @@ class Folder:
         return mime if mime else "application/octet-stream"
     
     @property
-    def parent(self) -> str:
-        return self.__path.parent.as_dir(end_sep=bool(self.__path.parent))
+    def files(self) -> tuple[File, ...]:
+        return tuple(self.__files)
+    
+    @property
+    def name(self):
+        return self.__path_name
+    
+    @property
+    def parent(self) -> Union["Folder", None]:
+        return self.__parent
     
     @property
     def path(self) -> str:
         return self.__path_str
-
+    
+    @property
+    def subfolders(self) -> tuple["Folder", ...]:
+        return tuple(map(self.__getitem__, range(len(self.__subdirectories)))) # type: ignore
+    
     def create_folder(self, name:str):
         self.__ss.post("https://dashboard.blomp.com/dashboard/storage/create_folder",
                        data={"_token": self.__ss.token, "pseudo-folder": self.__path_str, "folder_name": name+"/"})
+        self.reload()
+    
+    def delete(self, item:Union[File, "Folder", str]) -> bool:
+        if isinstance(item, str):
+            item_ = self.get_file_by_name(item) or self.get_folder_by_name(item)
+            if item_ is None:
+                raise ValueError("Item not found")
+            
+            item = item_
         
+        if isinstance(item, File):
+            r = self.__ss.get("https://dashboard.blomp.com/dashboard/storage/delete_object", params=dict(path=item.file_path))
+
+        else:
+            r = self.__ss.get("https://dashboard.blomp.com/dashboard/storage/delete_folder", params=dict(folder=item.__path_str))
+        
+        return bool(r.json()["response"])
+
+    def get_file_by_name(self, name:str) -> File | None:
+        for file in self.__files:
+            if file.name == name:
+                return file
+    
+    def get_folder_by_name(self, name:str) -> Union["Folder", None]:
+        for i in range(len(self.__subdirectories)):
+            folder = self.__subdirectories[i]
+
+            if isinstance(folder, dict):
+                p = Path(folder["subdir"])
+                if p.parts[-1] == name:
+                    folder = Folder(p, self, self.__ss)
+                    self.__subdirectories[i] = folder
+                    return folder
+            
+            else:
+                if folder.__path_name == name:
+                    return folder
+                
     def paste(self, file_or_folder:Union[File, "Folder"], cut:bool=False) -> bool:
         ff = file_or_folder
         is_file = isinstance(ff, File)
@@ -149,7 +199,10 @@ class Folder:
 
     def rename(self, new_name:str) -> bool:
         if not bool(self.__path):
-            raise ValueError("Unable to rename root folder")
+            raise PermissionError("Unable to rename root folder")
+        
+        from warnings import warn
+        warn('This method may not work correctly. It is recommended to use the "safe_rename" method', RuntimeWarning)
         
         r = self.__ss.get("https://dashboard.blomp.com/dashboard/file/rename",
                           params=dict(original_name=self.__path_name, type="folder", name=new_name, path=self.__path_str))
@@ -160,6 +213,20 @@ class Folder:
             self._self_path_changed()
         
         return success
+    
+    def safe_rename(self, new_name:str):
+        if self.__parent is None:
+            raise PermissionError("Unable to rename root folder")
+        
+        self.__parent.create_folder(new_name)
+        new_folder:Folder = self.__parent.get_folder_by_name(new_name) # type: ignore
+
+        for ff in self:
+            new_folder.paste(ff, True)
+        
+        self.__parent.delete(self)
+        self.__path = new_folder.__path
+        self._self_path_changed()
 
     def upload(self, file:str|pathlib.Path|BufferedIOBase, file_name:str|None=None, file_size:int|None=None) -> tuple[Thread, Monitor]:
         if isinstance(file, (str, pathlib.Path)):

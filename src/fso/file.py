@@ -76,11 +76,6 @@ class File:
     def size(self) -> int:
         return self.__length
     
-    def delete(self) -> bool:
-        r = self.__ss.get("https://dashboard.blomp.com/dashboard/storage/delete_object", params=dict(path=self.__file_path))
-
-        return bool(r.json()["response"])
-    
     def download(self, file_or_path:str|pathlib.Path|BufferedIOBase=".", buffer_size:int=4096) -> tuple[Thread, Monitor]:
         fp = file_or_path
         r = self.__ss.get("https://dashboard.blomp.com/dashboard/storage/download_object", stream=True,

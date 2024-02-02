@@ -23,4 +23,4 @@ class Blomp:
         self.__ss.client_id = int(re.findall(r'<input type="hidden" id="clientId" value="(\d+)">', content)[0])
     
     def get_root_directory(self) -> Folder:
-        return Folder("", self.__ss)
+        return Folder("", None, self.__ss)
