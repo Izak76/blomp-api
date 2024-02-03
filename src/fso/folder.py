@@ -52,7 +52,7 @@ class Folder:
     def __str__(self) -> str:
         return self.__path_name
     
-    def __uploader(self, _multi_encoder:MultipartEncoder, file_size:int, _update_func:Callable[[int], None]):
+    def __uploader(self, _multi_encoder:MultipartEncoder, _file_size:int, _buffer_size:int, _update_func:Callable[[int], None]):
         url, path = "https://dashboard.blomp.com", "/dashboard/storage/upload_object"
         conn:HTTPSConnection = self.__ss.adapters['https://'].get_connection(url)._get_conn()
         conn.putrequest("POST", path)
@@ -65,12 +65,12 @@ class Folder:
         conn.putheader("Cookie", "; ".join(map(lambda ck: "=".join(ck), self.__ss.cookies.get_dict().items())))
         conn.endheaders()
 
-        conn.send(_multi_encoder.read(_multi_encoder.len - file_size))
-        data = _multi_encoder.read(8192)
+        conn.send(_multi_encoder.read(_multi_encoder.len - _file_size))
+        data = _multi_encoder.read(_buffer_size)
         while data:
             _update_func(len(data))
             conn.send(data)
-            data = _multi_encoder.read(8192)
+            data = _multi_encoder.read(_buffer_size)
         
         response = conn.getresponse()
         if response.getheader("Set-Cookie"):
@@ -126,7 +126,6 @@ class Folder:
     def create_folder(self, name:str):
         self.__ss.post("https://dashboard.blomp.com/dashboard/storage/create_folder",
                        data={"_token": self.__ss.token, "pseudo-folder": self.__path_str, "folder_name": name+"/"})
-        self.reload()
     
     def delete(self, item:Union[File, "Folder", str]) -> bool:
         if isinstance(item, str):
@@ -177,7 +176,6 @@ class Folder:
         response = self.__ss.get("https://dashboard.blomp.com/dashboard/file/move", params=params)
         
         if response.text == "success":
-            self.reload()
             ff._parent_path_changed(self.__path)
             return True
         
@@ -186,16 +184,26 @@ class Folder:
     def reload(self):
         folder_data:list[FileData | Subdir] = self.__ss.get("https://dashboard.blomp.com/dashboard/folder?prefix",
                                                           params=dict(prefix=self.__path_str)).json()["data"]
-        self.__subdirectories.clear()
+        subdirectories:list[Subdir] = []
         self.__files.clear()
 
         for fd in folder_data:
             if "subdir" in fd:
-                self.__subdirectories.append(fd)
+                subdirectories.append(fd)
                 continue
 
             if fd["content_type"] != "application/directory":
                 self.__files.append(File(self.__path, fd, self.__ss))
+        
+        for file in self.__files:
+            if file.size >= 104857600:
+                for sd in subdirectories:
+                    sd_name = Path(sd["subdir"]).parts[-1]
+                    if file.name == sd_name:
+                        subdirectories.remove(sd)
+        
+        self.__subdirectories.clear()
+        self.__subdirectories.extend(subdirectories)
 
     def rename(self, new_name:str) -> bool:
         if not bool(self.__path):
@@ -228,23 +236,28 @@ class Folder:
         self.__path = new_folder.__path
         self._self_path_changed()
 
-    def upload(self, file:str|pathlib.Path|BufferedIOBase, file_name:str|None=None, file_size:int|None=None) -> tuple[Thread, Monitor]:
+    def upload(self, file:str|pathlib.Path|BufferedIOBase, file_name:str|None=None, file_size:int|None=None, replace_if_exists:bool=False, buffer_size:int=8192) -> tuple[Thread, Monitor]:
         if isinstance(file, (str, pathlib.Path)):
             file = open(file, 'rb')
         
         if not file_name:
             if not hasattr(file, "name"):
-                raise ValueError('Unable to determine file name. The "file_name" attribute must be specified')
+                raise ValueError('Unable to determine file name. The "file_name" parameter must be specified')
             
             file_name = pathlib.Path(file.name).parts[-1] # type: ignore
         
         if file_size is None:
             if not file.seekable():
-                raise ValueError('Unable to determine file size. The "file_size" attribute must be specified')
+                raise ValueError('Unable to determine file size. The "file_size" parameter must be specified')
             
             s = file.seek(0, 1)
             file_size = file.seek(0, 2)
             file.seek(s)
+        
+        if not replace_if_exists:
+            for f in self.__files:
+                if f.name == file_name:
+                    raise FileExistsError('A file with same was found. Set the "replace_if_exists" parameter to True to replace the old file or set "file_name" parameter')
         
         boundary = str(uuid4())
         monitor = UploadMonitor(file_size)
@@ -267,7 +280,7 @@ class Folder:
             "myfile": (file_name, file, self.__guess_mime(file_name)) # type: ignore
         }, boundary)
 
-        thread = Thread(target=self.__uploader, args=[me, file_size, monitor._update])
+        thread = Thread(target=self.__uploader, args=[me, file_size, buffer_size, monitor._update])
         thread.start()
 
         return thread, monitor
