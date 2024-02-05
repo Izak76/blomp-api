@@ -1,17 +1,14 @@
+from .utils.user_agent import get_user_agent
 from .utils.session import Session
+from typing import Literal
 from .fso import *
 import re
 
 
-UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) \
-AppleWebKit/537.36 (KHTML, like Gecko) \
-Chrome/117.0.0.0 Safari/537.36 \
-Edg/117.0.2045.36"
-
 class Blomp:
-    def __init__(self, email:str, password:str):
+    def __init__(self, email:str, password:str, browser:Literal['chrome', 'edge', 'safari', 'firefox']="chrome"):
         self.__ss = Session()
-        self.__ss.headers["User-Agent"] = UA
+        self.__ss.headers["User-Agent"] = get_user_agent(browser)
         self.__ss.headers["Referer"] = "https://www.blomp.com/"
         p = self.__ss.post("https://dashboard.blomp.com/authorize", data={"email": email, "password": password}, stream=False)
 
