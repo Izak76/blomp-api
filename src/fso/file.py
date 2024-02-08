@@ -52,6 +52,14 @@ class File:
         self.__path = new_path
         self.__file_path:str = str(self.__path/Path(self.__name))
 
+    def __share_info(self):
+        info: ShareLinkResponse = self.__ss.get("https://dashboard.blomp.com/dashboard/file/share/link",
+                            params=dict(path=self.__file_path, size=self.__length)).json()["info"]
+        info["link"] = "https://sharedby.blomp.com/"+info["link"]
+        self.__file_id = info["id"]
+        self.__share_status = bool(info["status"])
+        self.__link = info["link"]
+    
     @property
     def content_type(self) -> str:
         return self.__content_type
@@ -104,7 +112,7 @@ class File:
         success =  r.text == "success"
         if success:
             self.__name = new_name
-            self.share_info()
+            self.__share_info()
         
         return success
     
@@ -119,7 +127,7 @@ class File:
             emails = ""
 
         if self.__file_id is None:
-            self.share_info()
+            self.__share_info()
 
         self.__ss.post("https://dashboard.blomp.com/dashboard/file/share/send", 
                        data=dict(_token=self.__ss.token, email=emails, link=self.__link, permission=perm),
@@ -127,20 +135,9 @@ class File:
         
         return self.__link # type: ignore
     
-    def share_info(self) -> ShareLinkResponse:
-        # TODO: Tornar esse método "privado"
-        info: ShareLinkResponse = self.__ss.get("https://dashboard.blomp.com/dashboard/file/share/link",
-                            params=dict(path=self.__file_path, size=self.__length)).json()["info"]
-        info["link"] = "https://sharedby.blomp.com/"+info["link"]
-        self.__file_id = info["id"]
-        self.__share_status = bool(info["status"])
-        self.__link = info["link"]
-
-        return info
-    
     def share_switch_off(self) -> bool:
         if self.__file_id is None:
-            self.share_info()
+            self.__share_info()
         
         if not self.__share_status:
             raise Exception("This file is not being shared")
@@ -152,7 +149,7 @@ class File:
     
     def share_switch_on(self) -> bool:
         if self.__file_id is None:
-            self.share_info()
+            self.__share_info()
 
         if self.__share_status:
             raise Exception("This file is already being shared")
