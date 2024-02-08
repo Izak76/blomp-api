@@ -1,17 +1,12 @@
-from pathlib import Path
-from typing import Literal
-import json, os, sys
+import sys
 
+user_agents = {
+    "darwin": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36",
+    "linux": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36",
+    "win32": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36"
+}
 
-def get_user_agent(browser:Literal['chrome', 'edge', 'safari', 'firefox']="chrome") -> str:
-    with Path(os.path.realpath(__file__)).with_name("user_agents.json").open() as f:
-        user_agents = json.load(f)
-    
-    if user_agents.get(sys.platform):
-        return user_agents[sys.platform][browser]["user_agent"]
-    
-    if sys.platform == "cygwin":
-        return user_agents["windows"][browser]["user_agent"]
-    
-    else:
-        return user_agents["linux"][browser]["user_agent"]
+user_agents["cygwin"] = user_agents["win32"]
+
+def get_user_agent() -> str:
+    return user_agents.get(sys.platform, user_agents["linux"])

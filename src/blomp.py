@@ -1,16 +1,15 @@
 from .utils.user_agent import get_user_agent
 from .utils.session import Session
-from typing import Literal
 from .fso import *
 import re
 
 
 class Blomp:
-    def __init__(self, email:str, password:str, browser:Literal['chrome', 'edge', 'safari', 'firefox']="chrome"):
+    def __init__(self, email:str, password:str):
         self.__ss = Session()
-        self.__ss.headers["User-Agent"] = get_user_agent(browser)
+        self.__ss.headers["User-Agent"] = get_user_agent()
         self.__ss.headers["Referer"] = "https://www.blomp.com/"
-        p = self.__ss.post("https://dashboard.blomp.com/authorize", data={"email": email, "password": password}, stream=False)
+        p = self.__ss.post("https://dashboard.blomp.com/authorize", data={"email": email, "password": password})
 
         if p.status_code >= 400:
             raise ConnectionRefusedError("Login returned status code {}".format(p.status_code))
