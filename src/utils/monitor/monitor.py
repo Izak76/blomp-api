@@ -16,12 +16,18 @@ class Monitor(abc.ABC):
     
     @property
     def total(self) -> int:
+        """Total file size to be loaded"""
+
         return self._total
     
     @property
     def loaded(self) -> int:
+        """Loaded file size"""
+
         return self._loaded
     
     @property
     def progress(self) -> float:
+        """File loaded progress, between [0, 1] (basically, loaded_size/total_size)"""
+        
         return self._loaded/self._total

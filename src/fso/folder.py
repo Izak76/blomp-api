@@ -17,6 +17,8 @@ import pathlib
 
 
 class Folder:
+    """Class to manipulate a folder stored in the Blomp Cloud"""
+
     def __init__(self, path:str|Path, parent:Union["Folder", None], session:Session):
         if isinstance(path, str):
             path = Path(path)
@@ -105,33 +107,70 @@ class Folder:
     
     @property
     def files(self) -> tuple[File, ...]:
+        """Tuple with all files in this folder"""
+
         return tuple(self.__files)
     
     @property
     def name(self):
+        """Name of this folder"""
+
         return self.__path_name
     
     @property
     def parent(self) -> Union["Folder", None]:
+        """Parent folder of this folder, if it exists (if this folder is root, None is returned)"""
+
         return self.__parent
     
     @property
     def path(self) -> str:
+        """Path of this folder"""
+
         return self.__path_str
     
     @property
     def subfolders(self) -> tuple["Folder", ...]:
+        """Tuple with all subfolders in this folder"""
+
         return tuple(map(self.__getitem__, range(len(self.__subdirectories)))) # type: ignore
     
     def create_folder(self, name:str):
+        """Create a new folder in this directory.
+
+        Parameters
+        ----------
+        name : `str`
+            Name of the folder to be created.
+        """
+
         self.__ss.post("https://dashboard.blomp.com/dashboard/storage/create_folder",
                        data={"_token": self.__ss.token, "pseudo-folder": self.__path_str, "folder_name": name+"/"})
     
     def delete(self, item:Union[File, "Folder", str]) -> bool:
+        """Deletes a folder or file in this directory.
+
+        Parameters
+        ----------
+        item : File or Folder or `str`
+            If this parameter is a File or Folder object, it must belong to this folder.
+            If this parameter is a string, it must be the name of a folder or file belonging to this folder.
+        
+        Returns
+        -------
+        success : `bool`
+            True, if the server reports that the operation was successful, or False otherwise.
+        
+        Raises
+        ------
+        FileNotFoundError
+            Raised if `item` parameter is not found in this folder.
+        """
+
         if isinstance(item, str):
             item_ = self.get_file_by_name(item) or self.get_folder_by_name(item)
             if item_ is None:
-                raise ValueError("Item not found")
+                raise FileNotFoundError("Item not found")
             
             item = item_
         
@@ -144,11 +183,39 @@ class Folder:
         return bool(r.json()["response"])
 
     def get_file_by_name(self, name:str) -> File | None:
+        """Finds a file in this folder by name and returns it, if exists.
+        
+        Parameters
+        ----------
+        name : `str`
+            File name to find
+        
+        Returns
+        -------
+        file : File or None
+            If the file is found, then a `File` object of it will be returned.
+            Otherwise, None will be returned.
+        """
+
         for file in self.__files:
             if file.name == name:
                 return file
     
     def get_folder_by_name(self, name:str) -> Union["Folder", None]:
+        """Finds a subfolder in this folder by name and returns it, if exists.
+        
+        Parameters
+        ----------
+        name : `str`
+            Folder name to find
+        
+        Returns
+        -------
+        folder : Folder or None
+            If the folder is found, then a `Folder` object of it will be returned.
+            Otherwise, None will be returned.
+        """
+
         for i in range(len(self.__subdirectories)):
             folder = self.__subdirectories[i]
 
@@ -164,6 +231,22 @@ class Folder:
                     return folder
                 
     def paste(self, file_or_folder:Union[File, "Folder"], cut:bool=False) -> bool:
+        """Pastes a file or folder from another directory into this folder
+
+        Parameters
+        ----------
+        file_or_folder : File or Folder
+            `File` or `Folder` object from another directory to be pasted into this folder.
+        cut : bool, optional
+            If `True`, the file/folder will be cut from its old directory and pasted into this folder.
+            If `False`, the file/folder will be copied to this folder. (Default: False)
+
+        Returns
+        -------
+        success : bool
+            True, if the server reports that the operation was successful, or False otherwise.
+        """
+
         ff = file_or_folder
         is_file = isinstance(ff, File)
         params = dict(
@@ -182,6 +265,8 @@ class Folder:
         return False
     
     def reload(self):
+        """This method updates the data in this folder. It should only be called when there are changes to this folder."""
+
         folder_data:list[FileData | Subdir] = self.__ss.get("https://dashboard.blomp.com/dashboard/folder?prefix",
                                                           params=dict(prefix=self.__path_str)).json()["data"]
         subdirectories:list[Subdir] = []
@@ -206,11 +291,31 @@ class Folder:
         self.__subdirectories.extend(subdirectories)
 
     def rename(self, new_name:str) -> bool:
+        """Renames this folder. This method **is unsafe**. Use the `safe_rename` method instead.
+
+        Parameters
+        ----------
+        new_name : `str`
+            New name for this folder.
+        
+        Returns
+        -------
+        success : `bool`
+            True, if the server reports that the operation was successful, or False otherwise.
+        
+        Warnings
+        --------
+        RuntimeWarning
+            Raised when calling this method due to its unsafe, as it tries to directly rename the folder.
+            Directly renaming a folder in the Blomp Cloud may not work correctly as there is a bug where the renaming process may end incompletely.
+            To rename this folder, use the `safe_rename` method instead.
+        """
+
         if not bool(self.__path):
             raise PermissionError("Unable to rename root folder")
         
         from warnings import warn
-        warn('This method may not work correctly. It is recommended to use the "safe_rename" method', RuntimeWarning)
+        warn('This method may not work correctly. It is recommended to use the "safe_rename" method instead.', RuntimeWarning)
         
         r = self.__ss.get("https://dashboard.blomp.com/dashboard/file/rename",
                           params=dict(original_name=self.__path_name, type="folder", name=new_name, path=self.__path_str))
@@ -223,6 +328,21 @@ class Folder:
         return success
     
     def safe_rename(self, new_name:str):
+        """Renames this folder. Use this method instead of `rename` method.
+
+        Parameters
+        ----------
+        new_name : `str`
+            New name for this folder.
+        
+        Notes
+        -----
+        This method creates a new folder with the name specified in the `new_name` parameter in the parent directory of this folder.
+        After that, all files and folders in this directory are cut and pasted into the new folder, and then this now empty folder is deleted.
+        This process may take a while, depending on the number of files present in this folder, but it is much safer than the `rename` method, which renames the folder directly.
+        Apparently, when directly renaming a folder, the Blomp Cloud does the same process described here, but incompletely in some cases, which makes the `rename` method unsafe.
+        """
+
         if self.__parent is None:
             raise PermissionError("Unable to rename root folder")
         
@@ -237,6 +357,42 @@ class Folder:
         self._self_path_changed()
 
     def upload(self, file:str|pathlib.Path|BufferedIOBase, file_name:str|None=None, file_size:int|None=None, replace_if_exists:bool=False, buffer_size:int=8192) -> tuple[Thread, Monitor]:
+        """Upload a file to this folder
+
+        Parameters
+        ----------
+        file : `str` or `pathlib.Path` or file-like object
+            If this parameter is a string or a Path, then this must be a path to an existing file.
+            If this parameter is a file-like object, then its contents will be uploaded.
+        file_name : `str`, optional
+            If specified, then the file will have the name specified in this parameter in the Blomp Cloud.
+            Otherwise (`file_name=None`), the file name will be obtained automatically if possible.
+            (Default: None)
+        file_size : int, optional
+            File size in bytes. If not specified, the file size will be obtained automatically if possible.
+            (Default: None (obtained automatically))
+        replace_if_exists : bool, optional
+            Parameter considered only when a file with the same name already exists in this folder.
+            If True, the existing file is replaced by the new one to be uploaded.
+            If False, `FileExistsError` is raised. (Default: False)
+        buffer_size : int, optional
+            Size, in bytes, of the content uploaded in each iteration. (Default: 8192)
+        
+        Returns
+        -------
+        upload_thread : `threading.Thread`
+            A function thread responsible for uploading the file.
+        upload_monitor : UploadMonitor
+            An object that can be used to monitor upload progress.
+        
+        Raises
+        ------
+        ValueError
+            Raised when the file name or size cannot be automatically determined if the `file_name` or `file_size` parameters are not specified.
+        FileExistsError
+            Raised when a file with the same name already exists in this directory, and the `replace_if_exists` parameter is False.
+        """
+        
         if isinstance(file, (str, pathlib.Path)):
             file = open(file, 'rb')
         

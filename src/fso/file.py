@@ -13,6 +13,8 @@ import os, pathlib
 
 
 class File:
+    """Class to manipulate a file stored in the Blomp Cloud"""
+
     def __init__(self, path:str|Path, dataobj:FileData, session:Session):
         if isinstance(path, str):
             path = Path(path)
@@ -42,11 +44,13 @@ class File:
     def __str__(self) -> str:
         return self.__name
     
-    def __downloader(self, _response:Response, _file:BufferedIOBase, _buffer_size:int, _update_func:Callable[[int], None]):
-        with _file:
-            for chunk in _response.iter_content(_buffer_size):
-                _update_func(_file.write(chunk))
-                _file.flush()
+    def __downloader(self, _response:Response, _file:BufferedIOBase, _buffer_size:int, _close:bool, _update_func:Callable[[int], None]):
+        for chunk in _response.iter_content(_buffer_size):
+            _update_func(_file.write(chunk))
+            _file.flush()
+        
+        if _close:
+            _file.close()
     
     def _parent_path_changed(self, new_path:Path):
         self.__path = new_path
@@ -62,30 +66,64 @@ class File:
     
     @property
     def content_type(self) -> str:
+        """Mime type of file"""
+
         return self.__content_type
     
     @property
     def file_path(self) -> str:
+        """Full file path"""
+
         return self.__file_path
     
     @property
     def last_modified(self) -> datetime:
+        """Date and time the file was last modified"""
+
         return self.__last_modified
     
     @property
     def md5_hash(self):
+        """File MD5 hash"""
+
         return self.__hash
     
     @property
     def name(self) -> str:
+        """File name"""
+
         return self.__name
     
     @property
     def size(self) -> int:
+        """File size"""
+
         return self.__length
     
-    def download(self, file_or_path:str|pathlib.Path|BufferedIOBase=".", buffer_size:int=4096) -> tuple[Thread, Monitor]:
+    def download(self, file_or_path:str|pathlib.Path|BufferedIOBase="", buffer_size:int=8192) -> tuple[Thread, Monitor]:
+        """Downloads the file to a specified directory or file-like object.
+
+        Parameters
+        ----------
+        file_or_path : `str` or `pathlib.Path` or file-like object
+            If this parameter is a string or a Path, then it can be a directory or file path.
+            If the parameter value exists as a directory, then the file will be saved in this directory with the same name as this file.
+            Otherwise (path + file name or just the file name), the parameter will be opened as a file, with its contents being saved there.
+
+            If this parameter is a file-like object, the content will be saved in it.
+        buffer_size : int, optional
+            Size, in bytes, of the content downloaded in each iteration. (Default: 8192)
+        
+        Returns
+        -------
+        download_thread : `threading.Thread`
+            A function thread responsible for downloading the file.
+        download_monitor : DownloadMonitor
+            An object that can be used to monitor download progress.
+        """
+
         fp = file_or_path
+        close = False
         r = self.__ss.get("https://dashboard.blomp.com/dashboard/storage/download_object", stream=True,
                           params=dict(path=self.__file_path, filename=self.__name, size=self.__length))
         
@@ -97,14 +135,28 @@ class File:
                 fp /= pathlib.Path(self.__name)
             
             fp = open(fp, 'wb')
+            close = True
         
         monitor = DownloadMonitor(self.__length)
-        thread = Thread(target=self.__downloader, args=(r, fp, buffer_size, monitor._update))
+        thread = Thread(target=self.__downloader, args=(r, fp, buffer_size, close, monitor._update))
         thread.start()
 
         return thread, monitor
 
     def rename(self, new_name:str) -> bool:
+        """Rename this file
+
+        Parameters
+        ----------
+        new_name : `str`
+            New name for this file
+        
+        Returns
+        -------
+        success : `bool`
+            True, if the server reports that the operation was successful, or False otherwise.
+        """
+
         path_ = self.__path.as_dir(end_sep=bool(self.__path))
         r = self.__ss.get("https://dashboard.blomp.com/dashboard/file/rename",
                           params=dict(original_name=self.__name, type="file", name=new_name, path=path_))
@@ -117,6 +169,21 @@ class File:
         return success
     
     def share(self, emails:Iterable[str]|None=None, anyone_can_view:bool=False) -> str:
+        """Enables the sharing feature for this file.
+
+        Parameters
+        ----------
+        emails : `Iterable[str]`, optional
+            Emails that will receive the shared file link. (Default: None (The link will not be sent to any email))
+        anyone_can_view : `bool`, optional
+            If True, anyone on the internet can see this file. If False, only added registered users (see email parameter) can see the file (theoretically).
+        
+        Returns
+        -------
+        link : `str`
+            Shared file link
+        """
+
         perm = int(bool(anyone_can_view))
 
         if emails:
@@ -136,6 +203,14 @@ class File:
         return self.__link # type: ignore
     
     def share_switch_off(self) -> bool:
+        """Enables sharing of this file.
+
+        Returns
+        -------
+        success : `bool`
+            True, if the server reports that the operation was successful, or False otherwise.
+        """
+
         if self.__file_id is None:
             self.__share_info()
         
@@ -148,6 +223,14 @@ class File:
         return r.text == "success"
     
     def share_switch_on(self) -> bool:
+        """Disables sharing of this file.
+
+        Returns
+        -------
+        success : `bool`
+            True, if the server reports that the operation was successful, or False otherwise.
+        """
+        
         if self.__file_id is None:
             self.__share_info()
 
