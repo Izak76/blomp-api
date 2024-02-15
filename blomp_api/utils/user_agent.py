@@ -8,5 +8,6 @@ user_agents = {
 
 user_agents["cygwin"] = user_agents["win32"]
 
+
 def get_user_agent() -> str:
     return user_agents.get(sys.platform, user_agents["linux"])

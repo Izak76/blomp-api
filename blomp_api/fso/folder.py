@@ -19,19 +19,19 @@ import pathlib
 class Folder:
     """Class to manipulate a folder stored in the Blomp Cloud"""
 
-    def __init__(self, path:str|Path, parent:Union["Folder", None], session:Session):
+    def __init__(self, path: str | Path, parent: Union["Folder", None], session: Session):
         if isinstance(path, str):
             path = Path(path)
 
         self.__ss = session
-        self.__subdirectories:list[Subdir|Folder] = []
-        self.__files:list[File] = []
+        self.__subdirectories: list[Subdir | Folder] = []
+        self.__files: list[File] = []
         self.__parent = parent
         self.__path = path
         self._self_path_changed(bool(path))
         self.reload()
-    
-    def __getitem__(self, i:int) -> Union[File, "Folder"]:
+
+    def __getitem__(self, i: int) -> Union[File, "Folder"]:
         if i < len(self.__subdirectories):
             sd = self.__subdirectories[i]
 
@@ -40,28 +40,30 @@ class Folder:
                 self.__subdirectories[i] = sd
 
             return sd
-        
-        return  self.__files[i-len(self.__subdirectories)]
-    
+
+        return self.__files[i-len(self.__subdirectories)]
+
     def __iter__(self) -> Iterator[Union[File, "Folder"]]:
         return map(self.__getitem__, range(len(self.__subdirectories)+len(self.__files)))
-    
+
     def __repr__(self) -> str:
-        dirs = ", ".join(map(lambda s: str(s) if isinstance(s, Folder) else str(Path(s["subdir"]).parts[-1]), self.__subdirectories))
+        dirs = ", ".join(map(
+            lambda s: str(s) if isinstance(s, Folder) else str(Path(s["subdir"]).parts[-1]),
+            self.__subdirectories))
         files = ", ".join(map(str, self.__files))
-        return "Folder(path={0}, subdirectories=[{1}], files=[{2}])".format(str(self.__path), dirs, files)
-    
+        return f"Folder(path={str(self.__path)}, subdirectories=[{dirs}], files=[{files}])"
+
     def __str__(self) -> str:
         return self.__path_name
-    
-    def __uploader(self, _multi_encoder:MultipartEncoder, _file_size:int, _buffer_size:int, _update_func:Callable[[int], None]):
+
+    def __uploader(self, _multi_encoder: MultipartEncoder, _file_size: int, _buffer_size: int, _update_func: Callable[[int], None]):
         url, path = "https://dashboard.blomp.com", "/dashboard/storage/upload_object"
-        conn:HTTPSConnection = self.__ss.adapters['https://'].get_connection(url)._get_conn()
+        conn: HTTPSConnection = self.__ss.adapters['https://'].get_connection(url)._get_conn()
         conn.putrequest("POST", path)
-        
+
         for header in self.__ss.headers.items():
             conn.putheader(*header)
-        
+
         conn.putheader("Content-Type", _multi_encoder.content_type)
         conn.putheader("Content-Length", str(_multi_encoder.len))
         conn.putheader("Cookie", "; ".join(map(lambda ck: "=".join(ck), self.__ss.cookies.get_dict().items())))
@@ -73,18 +75,18 @@ class Folder:
             _update_func(len(data))
             conn.send(data)
             data = _multi_encoder.read(_buffer_size)
-        
+
         response = conn.getresponse()
         if response.getheader("Set-Cookie"):
             self.__ss.cookies.extract_cookies(response, Request(url+path))
-        
+
         self.reload()
-    
-    def _parent_path_changed(self, new_path:Path):
+
+    def _parent_path_changed(self, new_path: Path):
         self.__path = new_path/self.__path_name
         self._self_path_changed()
-    
-    def _self_path_changed(self, not_is_root:bool=True):
+
+    def _self_path_changed(self, not_is_root: bool = True):
         self.__path_str = self.__path.as_dir(end_sep=not_is_root)
 
         try:
@@ -94,48 +96,48 @@ class Folder:
 
         for sd in self.__subdirectories:
             if isinstance(sd, Folder):
-              sd._parent_path_changed(self.__path)
-        
+                sd._parent_path_changed(self.__path)
+
         for file in self.__files:
             file._parent_path_changed(self.__path)
 
     @staticmethod
-    def __guess_mime(file_uri:str) -> str:
+    def __guess_mime(file_uri: str) -> str:
         mime = mimetypes.guess_type(file_uri)[0]
 
         return mime if mime else "application/octet-stream"
-    
+
     @property
     def files(self) -> tuple[File, ...]:
         """Tuple with all files in this folder"""
 
         return tuple(self.__files)
-    
+
     @property
     def name(self):
         """Name of this folder"""
 
         return self.__path_name
-    
+
     @property
     def parent(self) -> Union["Folder", None]:
         """Parent folder of this folder, if it exists (if this folder is root, None is returned)"""
 
         return self.__parent
-    
+
     @property
     def path(self) -> str:
         """Path of this folder"""
 
         return self.__path_str
-    
+
     @property
     def subfolders(self) -> tuple["Folder", ...]:
         """Tuple with all subfolders in this folder"""
 
         return tuple(map(self.__getitem__, range(len(self.__subdirectories)))) # type: ignore
-    
-    def create_folder(self, name:str):
+
+    def create_folder(self, name: str):
         """Create a new folder in this directory.
 
         Parameters
@@ -146,8 +148,8 @@ class Folder:
 
         self.__ss.post("https://dashboard.blomp.com/dashboard/storage/create_folder",
                        data={"_token": self.__ss.token, "pseudo-folder": self.__path_str, "folder_name": name+"/"})
-    
-    def delete(self, item:Union[File, "Folder", str]) -> bool:
+
+    def delete(self, item: Union[File, "Folder", str]) -> bool:
         """Deletes a folder or file in this directory.
 
         Parameters
@@ -155,12 +157,12 @@ class Folder:
         item : File or Folder or `str`
             If this parameter is a File or Folder object, it must belong to this folder.
             If this parameter is a string, it must be the name of a folder or file belonging to this folder.
-        
+
         Returns
         -------
         success : `bool`
             True, if the server reports that the operation was successful, or False otherwise.
-        
+
         Raises
         ------
         FileNotFoundError
@@ -168,28 +170,31 @@ class Folder:
         """
 
         if isinstance(item, str):
-            item_ = self.get_file_by_name(item) or self.get_folder_by_name(item)
+            item_ = (self.get_file_by_name(item) or
+                     self.get_folder_by_name(item))
             if item_ is None:
                 raise FileNotFoundError("Item not found")
-            
+
             item = item_
-        
+
         if isinstance(item, File):
-            r = self.__ss.get("https://dashboard.blomp.com/dashboard/storage/delete_object", params=dict(path=item.file_path))
+            r = self.__ss.get("https://dashboard.blomp.com/dashboard/storage/delete_object",
+                              params=dict(path=item.file_path))
 
         else:
-            r = self.__ss.get("https://dashboard.blomp.com/dashboard/storage/delete_folder", params=dict(folder=item.__path_str))
-        
+            r = self.__ss.get("https://dashboard.blomp.com/dashboard/storage/delete_folder",
+                              params=dict(folder=item.__path_str))
+
         return bool(r.json()["response"])
 
-    def get_file_by_name(self, name:str) -> File | None:
+    def get_file_by_name(self, name: str) -> File | None:
         """Finds a file in this folder by name and returns it, if exists.
-        
+
         Parameters
         ----------
         name : `str`
             File name to find
-        
+
         Returns
         -------
         file : File or None
@@ -200,15 +205,15 @@ class Folder:
         for file in self.__files:
             if file.name == name:
                 return file
-    
-    def get_folder_by_name(self, name:str) -> Union["Folder", None]:
+
+    def get_folder_by_name(self, name: str) -> Union["Folder", None]:
         """Finds a subfolder in this folder by name and returns it, if exists.
-        
+
         Parameters
         ----------
         name : `str`
             Folder name to find
-        
+
         Returns
         -------
         folder : Folder or None
@@ -225,12 +230,12 @@ class Folder:
                     folder = Folder(p, self, self.__ss)
                     self.__subdirectories[i] = folder
                     return folder
-            
+
             else:
                 if folder.__path_name == name:
                     return folder
-                
-    def paste(self, file_or_folder:Union[File, "Folder"], cut:bool=False) -> bool:
+
+    def paste(self, file_or_folder: Union[File, "Folder"], cut: bool = False) -> bool:
         """Pastes a file or folder from another directory into this folder
 
         Parameters
@@ -250,26 +255,26 @@ class Folder:
         ff = file_or_folder
         is_file = isinstance(ff, File)
         params = dict(
-            original_path = ff.file_path if is_file else ff.path,
-            action = "move" if cut else "copy",
-            target_path = self.__path_str,
-            file_name = ff.name if is_file else "",
-            type = "file" if is_file else "folder"
+            original_path=ff.file_path if is_file else ff.path,
+            action="move" if cut else "copy",
+            target_path=self.__path_str,
+            file_name=ff.name if is_file else "",
+            type="file" if is_file else "folder"
         )
         response = self.__ss.get("https://dashboard.blomp.com/dashboard/file/move", params=params)
-        
+
         if response.text == "success":
             ff._parent_path_changed(self.__path)
             return True
-        
+
         return False
-    
+
     def reload(self):
         """This method updates the data in this folder. It should only be called when there are changes to this folder."""
 
-        folder_data:list[FileData | Subdir] = self.__ss.get("https://dashboard.blomp.com/dashboard/folder?prefix",
-                                                          params=dict(prefix=self.__path_str)).json()["data"]
-        subdirectories:list[Subdir] = []
+        folder_data: list[FileData | Subdir] = self.__ss.get("https://dashboard.blomp.com/dashboard/folder?prefix",
+                                                             params=dict(prefix=self.__path_str)).json()["data"]
+        subdirectories: list[Subdir] = []
         self.__files.clear()
 
         for fd in folder_data:
@@ -279,30 +284,30 @@ class Folder:
 
             if fd["content_type"] != "application/directory":
                 self.__files.append(File(self.__path, fd, self.__ss))
-        
+
         for file in self.__files:
             if file.size >= 104857600:
                 for sd in subdirectories:
                     sd_name = Path(sd["subdir"]).parts[-1]
                     if file.name == sd_name:
                         subdirectories.remove(sd)
-        
+
         self.__subdirectories.clear()
         self.__subdirectories.extend(subdirectories)
 
-    def rename(self, new_name:str) -> bool:
+    def rename(self, new_name: str) -> bool:
         """Renames this folder. This method **is unsafe**. Use the `safe_rename` method instead.
 
         Parameters
         ----------
         new_name : `str`
             New name for this folder.
-        
+
         Returns
         -------
         success : `bool`
             True, if the server reports that the operation was successful, or False otherwise.
-        
+
         Warnings
         --------
         RuntimeWarning
@@ -313,28 +318,28 @@ class Folder:
 
         if not bool(self.__path):
             raise PermissionError("Unable to rename root folder")
-        
+
         from warnings import warn
         warn('This method may not work correctly. It is recommended to use the "safe_rename" method instead.', RuntimeWarning)
-        
+
         r = self.__ss.get("https://dashboard.blomp.com/dashboard/file/rename",
                           params=dict(original_name=self.__path_name, type="folder", name=new_name, path=self.__path_str))
-        
-        success =  r.text == "success"
+
+        success = r.text == "success"
         if success:
             self.__path = self.__path.parent/new_name
             self._self_path_changed()
-        
+
         return success
-    
-    def safe_rename(self, new_name:str):
+
+    def safe_rename(self, new_name: str):
         """Renames this folder. Use this method instead of `rename` method.
 
         Parameters
         ----------
         new_name : `str`
             New name for this folder.
-        
+
         Notes
         -----
         This method creates a new folder with the name specified in the `new_name` parameter in the parent directory of this folder.
@@ -345,18 +350,18 @@ class Folder:
 
         if self.__parent is None:
             raise PermissionError("Unable to rename root folder")
-        
+
         self.__parent.create_folder(new_name)
-        new_folder:Folder = self.__parent.get_folder_by_name(new_name) # type: ignore
+        new_folder: Folder = self.__parent.get_folder_by_name(new_name)  # type: ignore
 
         for ff in self:
             new_folder.paste(ff, True)
-        
+
         self.__parent.delete(self)
         self.__path = new_folder.__path
         self._self_path_changed()
 
-    def upload(self, file:str|pathlib.Path|BufferedIOBase, file_name:str|None=None, file_size:int|None=None, replace_if_exists:bool=False, buffer_size:int=8192) -> tuple[Thread, Monitor]:
+    def upload(self, file: str | pathlib.Path | BufferedIOBase, file_name: str | None = None, file_size: int | None = None, replace_if_exists: bool = False, buffer_size: int = 8192) -> tuple[Thread, Monitor]:
         """Upload a file to this folder
 
         Parameters
@@ -377,14 +382,14 @@ class Folder:
             If False, `FileExistsError` is raised. (Default: False)
         buffer_size : int, optional
             Size, in bytes, of the content uploaded in each iteration. (Default: 8192)
-        
+
         Returns
         -------
         upload_thread : `threading.Thread`
             A function thread responsible for uploading the file.
         upload_monitor : UploadMonitor
             An object that can be used to monitor upload progress.
-        
+
         Raises
         ------
         ValueError
@@ -392,29 +397,29 @@ class Folder:
         FileExistsError
             Raised when a file with the same name already exists in this directory, and the `replace_if_exists` parameter is False.
         """
-        
+
         if isinstance(file, (str, pathlib.Path)):
             file = open(file, 'rb')
-        
+
         if not file_name:
             if not hasattr(file, "name"):
                 raise ValueError('Unable to determine file name. The "file_name" parameter must be specified')
-            
-            file_name = pathlib.Path(file.name).parts[-1] # type: ignore
-        
+
+            file_name = pathlib.Path(file.name).parts[-1]  # type: ignore
+
         if file_size is None:
             if not file.seekable():
                 raise ValueError('Unable to determine file size. The "file_size" parameter must be specified')
-            
+
             s = file.seek(0, 1)
             file_size = file.seek(0, 2)
             file.seek(s)
-        
+
         if not replace_if_exists:
             for f in self.__files:
                 if f.name == file_name:
                     raise FileExistsError('A file with same was found. Set the "replace_if_exists" parameter to True to replace the old file or set "file_name" parameter')
-        
+
         boundary = str(uuid4())
         monitor = UploadMonitor(file_size)
 
@@ -433,10 +438,11 @@ class Folder:
             "_token": self.__ss.token,
             "client-id": str(self.__ss.client_id),
             "pseudo-folder": self.__path_str,
-            "myfile": (file_name, file, self.__guess_mime(file_name)) # type: ignore
+            "myfile": (file_name, file, self.__guess_mime(file_name))
         }, boundary)
 
-        thread = Thread(target=self.__uploader, args=[me, file_size, buffer_size, monitor._update])
+        thread = Thread(target=self.__uploader, args=[
+                        me, file_size, buffer_size, monitor._update])
         thread.start()
 
         return thread, monitor
