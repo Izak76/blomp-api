@@ -1,4 +1,5 @@
 from requests_toolbelt import MultipartEncoder
+from requests_toolbelt.multipart.encoder import total_len
 from http.client import HTTPSConnection
 from typing import Union, Callable, Iterator
 from urllib.request import Request
@@ -361,7 +362,7 @@ class Folder:
         self.__path = new_folder.__path
         self._self_path_changed()
 
-    def upload(self, file: str | pathlib.Path | BufferedIOBase, file_name: str | None = None, file_size: int | None = None, replace_if_exists: bool = False, buffer_size: int = 8192) -> tuple[Thread, Monitor]:
+    def upload(self, file: str | pathlib.Path | BufferedIOBase, file_name: str | None = None, replace_if_exists: bool = False, buffer_size: int = 8192) -> tuple[Thread, Monitor]:
         """Upload a file to this folder
 
         Parameters
@@ -393,7 +394,7 @@ class Folder:
         Raises
         ------
         ValueError
-            Raised when the file name or size cannot be automatically determined if the `file_name` or `file_size` parameters are not specified.
+            Raised when the file name or size cannot be automatically determined if the `file_name` parameter are not specified.
         FileExistsError
             Raised when a file with the same name already exists in this directory, and the `replace_if_exists` parameter is False.
         """
@@ -407,13 +408,15 @@ class Folder:
 
             file_name = pathlib.Path(file.name).parts[-1]  # type: ignore
 
-        if file_size is None:
-            if not file.seekable():
-                raise ValueError('Unable to determine file size. The "file_size" parameter must be specified')
+        file_size = total_len(file)
 
+        if not file_size and file.seekable():
             s = file.seek(0, 1)
             file_size = file.seek(0, 2)
             file.seek(s)
+        
+        else:
+            raise ValueError('Unable to determine file size')
 
         if not replace_if_exists:
             for f in self.__files:
