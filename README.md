@@ -28,6 +28,7 @@ A unofficial Python API client to the [Blomp cloud](https://www.blomp.com).
 - [Other information](#other-information)
 - [License](#license)
 - [Source Code](#source-code)
+- [Changelog](#changelog)
 
 ## Instalation
 Blomp API can be installed with pip:
