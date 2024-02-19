@@ -273,9 +273,9 @@ class Folder:
     def reload(self):
         """This method updates the data in this folder. It should only be called when there are changes to this folder."""
 
-        folder_data: list[FileData | Subdir] = self.__ss.get("https://dashboard.blomp.com/dashboard/folder?prefix",
+        folder_data: List[Union[FileData, Subdir]] = self.__ss.get("https://dashboard.blomp.com/dashboard/folder?prefix",
                                                              params=dict(prefix=self.__path_str)).json()["data"]
-        subdirectories: list[Subdir] = []
+        subdirectories: List[Subdir] = []
         self.__files.clear()
 
         for fd in folder_data:

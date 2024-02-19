@@ -33,7 +33,7 @@ class File:
         self.__file_path: str = str(self.__path/Path(self.__name))
 
     def __hash__(self) -> int:
-        return hash(self.__hash)
+        return int(self.__hash, 16)
 
     def __len__(self) -> int:
         return self.__length
@@ -83,7 +83,7 @@ class File:
         return self.__last_modified
 
     @property
-    def md5_hash(self):
+    def md5_hash(self) -> str:
         """File MD5 hash"""
 
         return self.__hash
