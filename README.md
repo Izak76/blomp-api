@@ -1,5 +1,39 @@
 # blomp-api
+
+[![Static Badge](https://img.shields.io/badge/GitHub-Source_code-blue?logo=github&logoColor=white)](https://github.com/Izak76/blomp-api)
+[![PyPI - License](https://img.shields.io/pypi/l/blomp-api)](https://github.com/Izak76/blomp-api/blob/main/LICENSE)
+[![PyPI - Version](https://img.shields.io/pypi/v/blomp-api)](https://pypi.org/project/blomp-api)
+![PyPI - Status](https://img.shields.io/pypi/status/blomp-api)
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/blomp-api?logo=python&logoColor=white)
+<!-- ([![Pepy Total Downlods](https://img.shields.io/pepy/dt/blomp-api)](https://www.pepy.tech/projects/blomp-api)) -->
+
 A unofficial Python API client to the [Blomp cloud](https://www.blomp.com).
+
+## Table of contents
+- [Instalation](#instalation)
+- [Examples](#examples)
+    - [Getting started with the API](#getting-started-with-the-api)
+    - [Example directory structure for the next examples](#example-directory-structure-for-the-next-examples)
+    - [Access files and folders](#access-files-and-folders)
+    - [Downloading a file and getting download progress](#downloading-a-file-and-getting-download-progress)
+    - [Uploading a file and getting upload progress](#uploading-a-file-and-getting-upload-progress)
+    - [Other operations with folders](#other-operations-with-folders)
+        - [Create a new folder](#create-a-new-folder)
+        - [Renaming a folder](#renaming-a-folder)
+        - [Cutting or copying files and folders](#cutting-or-copying-files-and-folders)
+        - [Deleting files and folders](#deleting-files-and-folders)
+    - [Other operations with files](#other-operations-with-files)
+        - [Renaming a file](#renaming-a-file)
+        - [Sharing a file](#sharing-a-file)
+- [Other information](#other-information)
+- [License](#license)
+- [Source Code](#source-code)
+
+## Instalation
+Blomp API can be installed with pip:
+```sh
+pip install blomp-api
+```
 
 ## Examples
 
@@ -197,3 +231,39 @@ file1.share_switch_off()
 # Enabling sharing of "file1.ext"
 file1.share_switch_on()
 ```
+
+## Other information
+For more information, type into your Python shell:
+```python
+help(<blomp_object>)
+```
+Where `<blomp_object>` can be:
+- A `Blomp` instance
+    - Example:
+        ```python
+        from blomp import Blomp
+
+        blomp = Blomp("youremail@example.com", "yourpassword")
+        help(blomp)
+        ```
+- A `Folder`object
+    - Example:
+        ```python
+        root = blomp.get_root_directory()
+        help(root)
+        ```
+- A `File` object
+    - Example:
+        ```python
+        file = root.get_file_by_name("<file_name>")
+        help(file)
+        ```
+
+## License
+This package is released under the MIT License. See the [LICENSE](https://github.com/Izak76/blomp-api/blob/main/LICENSE) file for details.
+
+## Source Code
+Source code is available on [GitHub](https://github.com/Izak76/blomp-api).
+
+## Changelog
+Changelog is available on [GitHub](https://github.com/Izak76/blomp-api/blob/main/CHANGELOG).
