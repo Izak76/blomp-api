@@ -1,17 +1,16 @@
+from ..response_types import FileData, Subdir
+from ..utils.monitor import Monitor, UploadMonitor
+from ..utils.path import Path
+from ..utils.session import Session
+from . import File
+
+from http.client import HTTPSConnection
 from requests_toolbelt import MultipartEncoder
 from requests_toolbelt.multipart.encoder import total_len
-from http.client import HTTPSConnection
-from typing import Union, Callable, Iterator
-from urllib.request import Request
-from io import BufferedIOBase
 from threading import Thread
+from typing import BinaryIO, Callable, Iterator, List, Optional, Tuple, Union
+from urllib.request import Request
 from uuid import uuid4
-
-from ..utils.session import Session
-from ..utils.monitor import UploadMonitor, Monitor
-from ..response_types import Subdir, FileData
-from ..utils.path import Path
-from . import File
 
 import mimetypes
 import pathlib
@@ -20,13 +19,13 @@ import pathlib
 class Folder:
     """Class to manipulate a folder stored in the Blomp Cloud"""
 
-    def __init__(self, path: str | Path, parent: Union["Folder", None], session: Session):
+    def __init__(self, path: Union[str, Path], parent: Optional["Folder"], session: Session):
         if isinstance(path, str):
             path = Path(path)
 
         self.__ss = session
-        self.__subdirectories: list[Subdir | Folder] = []
-        self.__files: list[File] = []
+        self.__subdirectories: List[Union[Subdir, Folder]] = []
+        self.__files: List[File] = []
         self.__parent = parent
         self.__path = path
         self._self_path_changed(bool(path))
@@ -52,6 +51,7 @@ class Folder:
             lambda s: str(s) if isinstance(s, Folder) else str(Path(s["subdir"]).parts[-1]),
             self.__subdirectories))
         files = ", ".join(map(str, self.__files))
+
         return f"Folder(path={str(self.__path)}, subdirectories=[{dirs}], files=[{files}])"
 
     def __str__(self) -> str:
@@ -109,7 +109,7 @@ class Folder:
         return mime if mime else "application/octet-stream"
 
     @property
-    def files(self) -> tuple[File, ...]:
+    def files(self) -> Tuple[File, ...]:
         """Tuple with all files in this folder"""
 
         return tuple(self.__files)
@@ -121,7 +121,7 @@ class Folder:
         return self.__path_name
 
     @property
-    def parent(self) -> Union["Folder", None]:
+    def parent(self) -> Optional["Folder"]:
         """Parent folder of this folder, if it exists (if this folder is root, None is returned)"""
 
         return self.__parent
@@ -133,7 +133,7 @@ class Folder:
         return self.__path_str
 
     @property
-    def subfolders(self) -> tuple["Folder", ...]:
+    def subfolders(self) -> Tuple["Folder", ...]:
         """Tuple with all subfolders in this folder"""
 
         return tuple(map(self.__getitem__, range(len(self.__subdirectories)))) # type: ignore
@@ -188,7 +188,7 @@ class Folder:
 
         return bool(r.json()["response"])
 
-    def get_file_by_name(self, name: str) -> File | None:
+    def get_file_by_name(self, name: str) -> Optional[File]:
         """Finds a file in this folder by name and returns it, if exists.
 
         Parameters
@@ -207,7 +207,7 @@ class Folder:
             if file.name == name:
                 return file
 
-    def get_folder_by_name(self, name: str) -> Union["Folder", None]:
+    def get_folder_by_name(self, name: str) -> Optional["Folder"]:
         """Finds a subfolder in this folder by name and returns it, if exists.
 
         Parameters
@@ -362,7 +362,7 @@ class Folder:
         self.__path = new_folder.__path
         self._self_path_changed()
 
-    def upload(self, file: str | pathlib.Path | BufferedIOBase, file_name: str | None = None, replace_if_exists: bool = False, buffer_size: int = 8192) -> tuple[Thread, Monitor]:
+    def upload(self, file: Union[str, pathlib.Path, BinaryIO], file_name: Optional[str] = None, replace_if_exists: bool = False, buffer_size: int = 8192) -> Tuple[Thread, Monitor]:
         """Upload a file to this folder
 
         Parameters

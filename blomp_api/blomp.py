@@ -1,6 +1,8 @@
 from .utils.user_agent import get_user_agent
 from .utils.session import Session
 from .fso import *
+
+from typing import Optional
 import re
 
 
@@ -52,16 +54,16 @@ class Blomp:
                 setattr(self, "__"+attr, match.groups()[0])
 
     @property
-    def available_storage(self) -> str | None:
+    def available_storage(self) -> Optional[str]:
         """Available storage in Blomp account, or None if this information cannot be obtained."""
 
         return getattr(self, "__avaliable_storage", None)
 
     @property
-    def files_and_folders(self) -> int | None:
+    def files_and_folders(self) -> Optional[int]:
         """Number of stored files and folders, or None if this information cannot be obtained."""
 
-        ff: str | None = getattr(self, "__files_and_folders", None)
+        ff: Optional[str] = getattr(self, "__files_and_folders", None)
 
         if isinstance(ff, str):
             return int(ff)
@@ -69,10 +71,10 @@ class Blomp:
         return None
 
     @property
-    def shared_files(self) -> int | None:
+    def shared_files(self) -> Optional[int]:
         """Number of shared files, or None if this information cannot be obtained."""
 
-        ff: str | None = getattr(self, "__shared_files", None)
+        ff: Optional[str] = getattr(self, "__shared_files", None)
 
         if isinstance(ff, str):
             return int(ff)
@@ -80,10 +82,10 @@ class Blomp:
         return None
 
     @property
-    def storage_capacity(self) -> str | None:
+    def storage_capacity(self) -> Optional[str]:
         """Total storage in the Blomp account, or None if this information cannot be obtained."""
 
-        ff: str | None = getattr(self, "__storage_capacity", None)
+        ff: Optional[str] = getattr(self, "__storage_capacity", None)
 
         if isinstance(ff, str):
             return ff.strip()
@@ -91,7 +93,7 @@ class Blomp:
         return None
 
     @property
-    def used_storage(self) -> str | None:
+    def used_storage(self) -> Optional[str]:
         """Used storage in the Blomp account, or None if this information cannot be obtained."""
 
         return getattr(self, "__used_storage", None)

@@ -1,4 +1,4 @@
-from typing import TypedDict
+from typing import Optional, TypedDict
 
 
 class ShareLinkResponse(TypedDict):
@@ -6,7 +6,7 @@ class ShareLinkResponse(TypedDict):
     container: str
     path: str
     link: str
-    added: str | None
+    added: Optional[str]
     created_at: str
     permission: int
     status: int

@@ -1,3 +1,4 @@
+from typing import Tuple, Union
 import re
 
 
@@ -26,20 +27,20 @@ class Path:
     def __str__(self) -> str:
         return self.__path_str
 
-    def __truediv__(self, path_: "Path|str") -> "Path":
+    def __truediv__(self, path_: Union["Path", str]) -> "Path":
         if isinstance(path_, str):
             path_ = Path(path_)
 
         return Path(self.__path_char.join(self.__path_parts+path_.__path_parts))
 
-    def __rtruediv__(self, path_: "Path|str") -> "Path":
+    def __rtruediv__(self, path_: Union["Path", str]) -> "Path":
         if isinstance(path_, str):
             path_ = Path(path_)
 
         return path_/self
 
     @property
-    def parts(self) -> tuple[str, ...]:
+    def parts(self) -> Tuple[str, ...]:
         """A tuple of strings with path components"""
 
         return self.__path_parts

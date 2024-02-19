@@ -1,13 +1,12 @@
+from ..response_types import FileData, ShareLinkResponse
+from ..utils.monitor import DownloadMonitor, Monitor
+from ..utils.path import Path
+from ..utils.session import Session
+
 from datetime import datetime
 from requests import Response
 from threading import Thread
-from io import BufferedIOBase
-from typing import Iterable, Callable
-
-from ..utils.path import Path
-from ..utils.session import Session
-from ..utils.monitor import DownloadMonitor, Monitor
-from ..response_types import ShareLinkResponse, FileData
+from typing import BinaryIO, Callable, Iterable, Optional, Tuple, Union
 
 import os
 import pathlib
@@ -16,7 +15,7 @@ import pathlib
 class File:
     """Class to manipulate a file stored in the Blomp Cloud"""
 
-    def __init__(self, path: str | Path, dataobj: FileData, session: Session):
+    def __init__(self, path: Union[Path, str], dataobj: FileData, session: Session):
         if isinstance(path, str):
             path = Path(path)
 
@@ -28,9 +27,9 @@ class File:
 
         self.__ss = session
         self.__path = path
-        self.__file_id: int | None = None
-        self.__share_status: bool | None = None
-        self.__link: str | None = None
+        self.__file_id: Optional[int] = None
+        self.__share_status: Optional[bool] = None
+        self.__link: Optional[str] = None
         self.__file_path: str = str(self.__path/Path(self.__name))
 
     def __hash__(self) -> int:
@@ -45,7 +44,7 @@ class File:
     def __str__(self) -> str:
         return self.__name
 
-    def __downloader(self, _response: Response, _file: BufferedIOBase, _buffer_size: int, _close: bool, _update_func: Callable[[int], None]):
+    def __downloader(self, _response: Response, _file: BinaryIO, _buffer_size: int, _close: bool, _update_func: Callable[[int], None]):
         for chunk in _response.iter_content(_buffer_size):
             _update_func(_file.write(chunk))
             _file.flush()
@@ -101,7 +100,7 @@ class File:
 
         return self.__length
 
-    def download(self, file_or_path: str | pathlib.Path | BufferedIOBase = "", buffer_size: int = 8192) -> tuple[Thread, Monitor]:
+    def download(self, file_or_path: Union[str, pathlib.Path, BinaryIO] = "", buffer_size: int = 8192) -> Tuple[Thread, Monitor]:
         """Downloads the file to a specified directory or file-like object.
 
         Parameters
@@ -170,7 +169,7 @@ class File:
 
         return success
 
-    def share(self, emails: Iterable[str] | None = None, anyone_can_view: bool = False) -> str:
+    def share(self, emails: Optional[Iterable[str]] = None, anyone_can_view: bool = False) -> str:
         """Enables the sharing feature for this file.
 
         Parameters
