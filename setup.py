@@ -8,7 +8,7 @@ with open("requirements.txt") as req, open("README.md") as readme:
 
 setup(
     name="blomp_api",
-    version="1.0.0.post1",
+    version="1.0.1",
     author="Izak76",
     url="https://pypi.org/project/blomp-api",
     description="A unofficial Python API client to the Blomp cloud.",
