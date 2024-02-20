@@ -410,13 +410,14 @@ class Folder:
 
         file_size = total_len(file)
 
-        if not file_size and file.seekable():
-            s = file.seek(0, 1)
-            file_size = file.seek(0, 2)
-            file.seek(s)
+        if not file_size:
+            if file.seekable():
+                s = file.seek(0, 1)
+                file_size = file.seek(0, 2)
+                file.seek(s)
         
-        else:
-            raise ValueError('Unable to determine file size')
+            else:
+                raise ValueError('Unable to determine file size')
 
         if not replace_if_exists:
             for f in self.__files:
