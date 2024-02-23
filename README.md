@@ -5,7 +5,7 @@
 [![PyPI - Version](https://img.shields.io/pypi/v/blomp-api)](https://pypi.org/project/blomp-api)
 ![PyPI - Status](https://img.shields.io/pypi/status/blomp-api)
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/blomp-api?logo=python&logoColor=white)
-<!-- ([![Pepy Total Downlods](https://img.shields.io/pepy/dt/blomp-api)](https://www.pepy.tech/projects/blomp-api)) -->
+[![Pepy Total Downlods](https://img.shields.io/pepy/dt/blomp-api)](https://www.pepy.tech/projects/blomp-api)
 
 A unofficial Python API client to the [Blomp cloud](https://www.blomp.com).
 

@@ -4,7 +4,7 @@ from ..utils.path import Path
 from ..utils.session import Session
 from . import File
 
-from http.client import HTTPSConnection
+from http.client import HTTPSConnection, ResponseNotReady
 from requests_toolbelt import MultipartEncoder
 from requests_toolbelt.multipart.encoder import total_len
 from threading import Thread
@@ -58,8 +58,8 @@ class Folder:
         return self.__path_name
 
     def __uploader(self, _multi_encoder: MultipartEncoder, _file_size: int, _buffer_size: int, _update_func: Callable[[int], None]):
-        url, path = "https://dashboard.blomp.com", "/dashboard/storage/upload_object"
-        conn: HTTPSConnection = self.__ss.adapters['https://'].get_connection(url)._get_conn()
+        url, path = "dashboard.blomp.com", "/dashboard/storage/upload_object"
+        conn = HTTPSConnection(url)
         conn.putrequest("POST", path)
 
         for header in self.__ss.headers.items():
@@ -76,10 +76,13 @@ class Folder:
             _update_func(len(data))
             conn.send(data)
             data = _multi_encoder.read(_buffer_size)
-
-        response = conn.getresponse()
-        if response.getheader("Set-Cookie"):
-            self.__ss.cookies.extract_cookies(response, Request(url+path))
+        
+        try:
+            response = conn.getresponse()
+            if response.getheader("Set-Cookie"):
+                self.__ss.cookies.extract_cookies(response, Request("https://"+url+path))
+        except ResponseNotReady:
+            pass
 
         self.reload()
 
