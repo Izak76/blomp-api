@@ -37,7 +37,7 @@ class Blomp:
             raise ConnectionError(f"Login returned status code {p.status_code}")
 
         content = next(p.iter_content(8192, True))
-        self.__ss.token = re.findall(r'<meta name="csrf_token" content="(.+)" />', content)[0]
+        self.__ss.token = re.findall(r'<meta name="csrf-token" content="(.+)"\x20?/?>', content)[0]
         self.__ss.client_id = int(re.findall(r'<input type="hidden" id="clientId" value="(\d+)">', content)[0])
 
         index_page = self.__ss.get("https://dashboard.blomp.com/dashboard/index").text
