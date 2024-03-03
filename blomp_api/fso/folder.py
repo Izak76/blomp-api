@@ -356,6 +356,7 @@ class Folder:
             raise PermissionError("Unable to rename root folder")
 
         self.__parent.create_folder(new_name)
+        self.__parent.reload()
         new_folder: Folder = self.__parent.get_folder_by_name(new_name)  # type: ignore
 
         for ff in self:

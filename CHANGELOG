@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.0.4] - 2024-03-03
+
+### Fixed
+Fixed bug in `safe_rename` method
+
 ## [1.0.3] - 2024-02-27
 
 ### Fixed
@@ -20,7 +25,6 @@ Fixed error when trying to get token.
 
 ### Fixed
 Fixed bug in `upload` method on `Folder` class.
-
 
 ## [1.0.0] - 2024-02-19
 Initial project.
